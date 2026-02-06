@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blue Seaway | Weekly race analysis 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --navy: #00254E;
+    --navy-deep: #001a38;
+    --navy-light: #003a6b;
+    --navy-state: #004D7E;
+    --navy-terrain: #004D7E;
+    --gold: #C9BB55;
+    --gold-light: #d4c86e;
+    --gold-dim: rgba(201, 187, 85, 0.65);
+    --white: #FFFFFF;
+    --white-80: rgba(255,255,255,0.8);
+    --white-60: rgba(255,255,255,0.6);
+    --white-40: rgba(255,255,255,0.4);
+    --white-20: rgba(255,255,255,0.2);
+    --white-10: rgba(255,255,255,0.1);
+    --white-05: rgba(255,255,255,0.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { overflow-x: hidden; }
+
+body {
+    background: var(--navy);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    color: var(--white);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.page {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.header h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 52px;
+    font-weight: 400;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+}
+
+.header .subtitle {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--white-80);
+    letter-spacing: 0.2px;
+}
+
+.header .subtitle span { color: var(--gold); }
+
+.header .intro {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--white-60);
+    max-width: 520px;
+    margin: 12px auto 0;
+    line-height: 1.5;
+}
+
+.map-wrap {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto 20px;
+}
+
+#map-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.state-fill {
+    fill: var(--navy-state);
+    stroke: none;
+    transition: fill 0.25s ease, opacity 0.25s ease;
+}
+
+.state-fill.covered {
+    fill: var(--gold);
+    opacity: 1;
+    cursor: pointer;
+}
+
+.state-fill.covered:hover { filter: brightness(1.1); }
+
+.state-fill.covered.active {
+    filter: brightness(1.15);
+}
+
+.state-fill.has-terrain {
+    fill: var(--navy-terrain);
+    cursor: pointer;
+    transition: fill 0.25s ease;
+}
+
+.state-fill.has-terrain:hover { fill: #005E96; }
+
+.state-borders {
+    fill: none;
+    stroke: var(--navy);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+.nation-border {
+    fill: none;
+    stroke: var(--navy);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+.state-label {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+    user-select: none;
+    text-anchor: middle;
+    dominant-baseline: central;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.state-label.visible { opacity: 1; }
+.state-label.on-gold { fill: var(--navy-deep); font-weight: 700; paint-order: stroke; stroke: var(--gold); stroke-width: 3px; stroke-linejoin: round; }
+.state-label.on-dark { fill: var(--white-80); }
+
+.leader-line {
+    stroke: rgba(255,255,255,0.5);
+    stroke-width: 1;
+    fill: none;
+}
+
+.leader-dot {
+    fill: rgba(255,255,255,0.5);
+}
+
+.state-fill.no-data { cursor: default; }
+.state-fill.has-terrain, .state-fill.covered { cursor: pointer; }
+
+#coming-soon {
+    position: absolute;
+    background: rgba(0,37,78,0.92);
+    color: var(--white-60);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    z-index: 20;
+    white-space: nowrap;
+}
+#coming-soon.visible { opacity: 1; }
+
+.map-loading {
+    text-align: center;
+    padding: 140px 0;
+    color: var(--white-40);
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.loading-bar {
+    width: 48px;
+    height: 2px;
+    background: var(--white-10);
+    margin: 16px auto 0;
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.loading-bar::after {
+    content: '';
+    display: block;
+    width: 50%;
+    height: 100%;
+    background: var(--gold-dim);
+    animation: loadSlide 1.2s ease-in-out infinite;
+}
+
+@keyframes loadSlide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+}
+
+.map-error {
+    text-align: center;
+    padding: 100px 0;
+    color: var(--white-40);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.prompt {
+    text-align: center;
+    font-size: 13px;
+    color: var(--white-60);
+    margin-bottom: 20px;
+    min-height: 20px;
+    transition: opacity 0.3s ease;
+    letter-spacing: 0.2px;
+}
+
+.prompt.hidden { opacity: 0; }
+
+.updated {
+    text-align: center;
+    font-size: 11px;
+    color: var(--white-20);
+    letter-spacing: 0.5px;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+}
+
+.panel {
+    background: linear-gradient(135deg, var(--navy-light) 0%, rgba(0,42,77,0.95) 100%);
+    border: 1px solid var(--white-10);
+    border-left: 3px solid var(--gold);
+    padding: 28px 32px;
+    margin-bottom: 32px;
+    display: none;
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+.panel.open {
+    display: block;
+    animation: panelIn 0.35s ease-out forwards;
+}
+
+@keyframes panelIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+}
+
+.panel-state {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px;
+    font-weight: 400;
+}
+
+.panel-close {
+    background: none;
+    border: 1px solid var(--white-20);
+    color: var(--white-60);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 12px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    border-radius: 2px;
+}
+
+.panel-close:hover {
+    color: var(--white);
+    border-color: var(--white-40);
+}
+
+.panel-terrain {
+    font-size: 16px;
+    color: var(--white);
+    line-height: 1.55;
+    font-weight: 400;
+    font-style: italic;
+}
+
+.panel-coverage {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--white-10);
+}
+
+.coverage-entry {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--white-05);
+}
+
+.coverage-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+.coverage-meta {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 6px;
+    letter-spacing: 0.2px;
+}
+
+.coverage-meta .meta-district {
+    font-family: 'Instrument Serif', serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.coverage-meta .meta-sep {
+    color: var(--white-40);
+    margin: 0 6px;
+}
+
+.coverage-meta .meta-status {
+    color: var(--white-60);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+}
+
+.coverage-meta .meta-pvi {
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.coverage-date {
+    font-size: 10px;
+    color: var(--white-40);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.coverage-line {
+    font-size: 14.5px;
+    color: var(--white-80);
+    line-height: 1.55;
+    font-weight: 300;
+}
+
+.panel-primary {
+    font-size: 12px;
+    color: var(--white-60);
+    margin-top: 10px;
+    letter-spacing: 0.3px;
+    font-weight: 400;
+}
+
+.panel-primary strong {
+    color: var(--gold);
+    font-weight: 500;
+}
+
+.panel-subscribe {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--white-10);
+}
+
+.subscribe-label {
+    font-size: 12px;
+    color: var(--white-60);
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+
+.subscribe-row {
+    display: flex;
+    gap: 8px;
+}
+
+.subscribe-row input[type="email"] {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--white-10);
+    border-radius: 4px;
+    color: var(--white);
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.subscribe-row input[type="email"]::placeholder {
+    color: var(--white-40);
+}
+
+.subscribe-row input[type="email"]:focus {
+    border-color: var(--gold);
+}
+
+.subscribe-row button {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--gold);
+    color: var(--navy);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    white-space: nowrap;
+}
+
+.subscribe-row button:hover {
+    background: var(--gold-light);
+}
+
+.subscribe-confirm {
+    font-size: 12px;
+    color: var(--gold);
+    letter-spacing: 0.3px;
+    font-weight: 500;
+    padding: 8px 0;
+}
+
+@media (max-width: 640px) {
+    .page { padding: 36px 16px 64px; }
+    .header h1 { font-size: 36px; }
+    .state-label { font-size: 9px; }
+    .panel { padding: 20px; }
+    .panel-state { font-size: 22px; }
+    .subscribe-row { flex-direction: column; }
+    .subscribe-row button { padding: 10px 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+    <header class="header">
+        <h1>Weekly race analysis 2026.</h1>
+        <p class="subtitle">Updated weekly from Brett Broesder's <span>WICC</span> radio analysis.</p>
+        <p class="intro">A handful of races will decide whether Congress changes hands in 2026. Every Sunday, Brett breaks down three of them on WICC radio's <em>Wake Up with Finch and Kane</em>.</p>
+    </header>
+
+    <div class="map-wrap" id="map-wrap">
+        <div class="map-loading" id="loading">
+            Loading
+            <div class="loading-bar"></div>
+        </div>
+        <div id="coming-soon">Coverage coming soon</div>
+    </div>
+
+    <p class="updated">Last verified: February 5, 2026</p>
+    <p class="prompt" id="prompt">Select a highlighted state to see race details.</p>
+
+    <div class="panel" id="panel">
+        <div class="panel-top">
+            <span class="panel-state" id="p-state"></span>
+            <button class="panel-close" id="p-close">Close</button>
+        </div>
+        <div id="p-body"></div>
+    </div>
+</div>
+
+<!-- D3 + TopoJSON -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+
+<script>
+/* =========================================
+   BLUE SEAWAY 2026 RACE MAP
+   Architecture: Data / Rendering separation
+
+   DATA LAYER (edit weekly):
+   - Terrain headlines: one sentence per state
+   - Coverage entries: date-stamped WICC broadcast lines
+   - Schema: { name, terrain, coverage: [{ date, line, district, status, pvi }] }
+
+   EDITORIAL RULES (locked Feb 1, 2026):
+   - No Dem primary frontrunner rankings
+   - Terrain facts only; no strategic predictions
+   - Date-stamp every entry to its WICC broadcast
+   - Archive, not endorsement
+   - Democratic lens, no advocacy
+   - Every named person gets party identification
+   - Lakoff framing: Democratic opportunity-first
+
+   WEEKLY UPDATE WORKFLOW:
+   1. Add coverage entry: push { date, line, district, status, pvi } to state's coverage array
+   2. Convert uncovered to covered: add coverage array to state object
+   3. Update "Last verified" date in HTML above
+   4. No changes below the DO NOT EDIT line
+
+   [VERIFY] = needs fact-check before publishing
+
+   [VERIFY: TERRAIN] These covered-state terrains may contain incorrect ballot claims.
+   Cross-reference against official 2026 cycle data:
+   - PA: Terrain says "A Senate seat" is on ballot. Ref sheet says no PA Senate race in 2026.
+   - NC: Terrain says "an open governor's race." Ref sheet says no NC governor's race in 2026 (Stein-D elected 2024).
+   - VA: Terrain says "an open governor's race." Ref sheet says no VA governor's race in 2026 (odd-year; Spanberger won Nov 2025).
+   - WA: Terrain says "A Senate seat, a governor's race." Ref sheet says neither on ballot in 2026. Also claims 8D House seats; ref sheet says 7D.
+   If ref sheet is correct, these terrains need structural rewrites, not just editorial fixes.
+   ========================================= */
+
+var DATA = {
+
+    /* === COVERED STATES (12): terrain + WICC coverage === */
+
+    "PA": {
+        name: "Pennsylvania",
+        terrain: "A Senate seat, a governor's race, and seventeen House seats are on the ballot. Democrats hold the Senate seat, the governor's office, and eight of the seventeen House seats.",
+        coverage: [
+            { date: "January 4, 2026", district: "PA-07", status: "Republican-held", pvi: "R+1", line: "This Lehigh Valley seat came down to 1.2 points in 2024, one of the closest House races in the country. Five Democrats are in the May primary." },
+            { date: "January 4, 2026", district: "PA-08", status: "Republican-held", pvi: "R+4", line: "Scranton had a Democrat in Congress for twelve years until this seat flipped by 1.5 points in 2024. Mayor Paige Cognetti is the Democratic challenger." },
+            { date: "January 4, 2026", district: "PA-01", status: "Republican-held", pvi: "D+1", line: "More Democrats live in this district than Republicans, but a Republican holds the seat with nearly $7 million in the bank." }
+        ]
+    },
+    "AZ": {
+        name: "Arizona",
+        terrain: "A governor\u2019s race, statewide offices, and nine House seats are on the ballot. Democrats hold the governorship, the attorney general\u2019s office, and the secretary of state\u2019s office.",
+        coverage: [
+            { date: "February 1, 2026", district: "AZ-01", status: "Open (R)", pvi: "R+1", line: "An open seat won by just 3.8 points in 2024. Trump endorsed two Republicans in the same primary; the field includes a former attorney general, a former NFL kicker, and the state party chair." }
+        ]
+    },
+    "CA": {
+        name: "California",
+        terrain: "Democrats hold all eight statewide offices and 43 of 52 House seats. Voter-approved redistricting redrew several Republican-held districts for the 2026 cycle.",
+        coverage: [
+            { date: "January 11, 2026", district: "CA-22", status: "Republican-held", pvi: "R+1", line: "Nearly two out of three people in this district depend on Medicaid, the highest share in any Republican-held seat. Their congressman was one of 17 Republicans who voted to protect health care subsidies." }
+        ]
+    },
+    "VA": {
+        name: "Virginia",
+        terrain: "A Senate seat, an open governor's race, and eleven House seats are on the ballot. Democrats hold the governorship, the Senate seat, and five of the eleven seats.",
+        coverage: [
+            { date: "January 11, 2026", district: "VA-01", status: "Republican-held", pvi: "R+3", line: "Democratic Gov. Spanberger won this district in her November election. Redistricting has made it more competitive since 2022, and nine Democrats have filed." }
+        ]
+    },
+    "WI": {
+        name: "Wisconsin",
+        terrain: "An open governor's race and eight House seats are on the ballot with no Senate race in 2026. Democrats hold the governor's office and two of the eight seats; the 2024 presidential margin was fewer than 30,000 votes.",
+        coverage: [
+            { date: "January 11, 2026", district: "WI-03", status: "Republican-held", pvi: "R+3", line: "In western Wisconsin, Democrat Rebecca Cooke outraised Republican incumbent Derrick Van Orden for the first time in late 2025. Van Orden holds this seat by 2.8 points after running 4 behind Trump." }
+        ]
+    },
+    "MN": {
+        name: "Minnesota",
+        terrain: "An open Senate seat, an open governor's race, and eight House seats are on the ballot. Democrats hold both open statewide seats and five of the eight House seats.",
+        coverage: [
+            { date: "January 18, 2026", district: "MN-Senate", status: "Democratic-held", pvi: "D+3", line: "Democrats have held this Senate seat since 2009. Peggy Flanagan, the state\u2019s Democratic lieutenant governor who would be the first Native American woman in the U.S. Senate, is among the candidates." },
+            { date: "January 18, 2026", district: "MN-02", status: "Open (D)", pvi: "D+3", line: "An open seat that leans Democratic after Democrat Angie Craig left to run for Senate. The Republican in the field lost this district in 2020 and 2022." }
+        ]
+    },
+    "NE": {
+        name: "Nebraska",
+        terrain: "A Senate seat, a governor's race, and three House seats are on the ballot. Republicans hold every seat, but one open House district voted Democratic for president in 2024.",
+        coverage: [
+            { date: "January 18, 2026", district: "NE-02", status: "Open (R)", pvi: "D+3", line: "The only House seat Harris carried by 5 points that a Republican held is now open. Three Democrats are competing in the May 12 primary." }
+        ]
+    },
+    "NC": {
+        name: "North Carolina",
+        terrain: "A Senate seat, an open governor's race, and fourteen House seats are on the ballot. Democrats and Republicans split the fourteen seats evenly after redistricting.",
+        coverage: [
+            { date: "January 25, 2026", district: "NC-01", status: "Democratic-held", pvi: "R+5", line: "Republicans redrew this seat in October, replacing Black communities with conservative coastal counties. Democrat Don Davis is running on the new map, where Black residents dropped from 40% of the district to 32%." }
+        ]
+    },
+    "ME": {
+        name: "Maine",
+        terrain: "A Senate seat, an open governor\u2019s race, and two House seats are on the ballot. Democrats hold the governorship and both House seats; a Republican holds the Senate seat.",
+        coverage: [
+            { date: "January 25, 2026", district: "ME-02", status: "Open (D)", pvi: "R+4", line: "Democrat Jared Golden chose not to run again in a district Trump won by 9.5 points. Republican former Gov. LePage and a crowded field compete in a June 9 primary." }
+        ]
+    },
+    "WA": {
+        name: "Washington",
+        terrain: "A Senate seat, a governor's race, and ten House seats are on the ballot. Democrats hold all statewide offices and eight of the ten seats.",
+        coverage: [
+            { date: "January 25, 2026", district: "WA-03", status: "Democratic-held", pvi: "R+2", line: "Democrat Marie Gluesenkamp Perez grew her margin from under 1 point to 3.9 points between 2022 and 2024. She faces a primary challenge from within her party and Republican John Braun in the general election." }
+        ]
+    },
+    "CT": {
+        name: "Connecticut",
+        terrain: "Democrats have won every statewide and congressional race since 2008. The governor\u2019s race headlines a full ballot."
+    },
+    "NJ": {
+        name: "New Jersey",
+        terrain: "A Senate seat and twelve House seats are on the ballot; the governor's office runs on an odd-year cycle. Democrats hold the Senate seat and nine of the twelve House seats.",
+        coverage: [
+            { date: "February 1, 2026", district: "NJ-11", status: "Open (D)", pvi: "D+5", line: "Democrat Mikie Sherrill won the governor\u2019s race by 14 points and left this congressional seat open. Eleven Democrats are competing in a special election; the final vote is April 16." }
+        ]
+    },
+    "MI": {
+        name: "Michigan",
+        terrain: "An open Senate seat, an open governor's race, and thirteen House seats are on the ballot. Four Democratic-held statewide offices are open at once, from the Senate seat to the secretary of state.",
+        coverage: [
+            { date: "February 1, 2026", district: "MI-11", status: "Open (D)", pvi: "D+9", line: "Democrat Haley Stevens won this seat by 19 points in 2024 and left to run for Senate. Michigan\u2019s Democratic governor, attorney general, and secretary of state all backed the same Democrat to replace her." }
+        ]
+    },
+
+    /* === UNCOVERED STATES: terrain headline only === */
+
+    "AL": { name: "Alabama", terrain: "Open US Senate seat and governor's race on the ballot. A Democrat won this Senate seat in 2017." },
+    "AK": { name: "Alaska", terrain: "A Senate seat, a governor\u2019s race, and one House seat are on the ballot. Republicans hold all of them." },
+    "AR": { name: "Arkansas", terrain: "Senate, governor, and four House seats are on the ballot. Democrats last won a statewide or federal race here in 2010." },
+    "CO": { name: "Colorado", terrain: "Every statewide office is open for the first time in a century, and eight House seats are on the ballot. Democrats hold all statewide offices." },
+    "DE": { name: "Delaware", terrain: "Five races on the ballot, from the Senate to state auditor. Democrats have won every one since at least 2018." },
+    "DC": { name: "District of Columbia", terrain: "No voting representation in Congress. Local elections only." },
+    "FL": { name: "Florida", terrain: "An open governor\u2019s race, a Senate special election, and twenty-eight House seats are on the ballot. Democrats last won a Florida statewide race in 2018." },
+    "GA": { name: "Georgia", terrain: "A Senate seat, an open governor\u2019s race, and fourteen House seats are on the ballot. Democrats hold the Senate seat." },
+    "HI": { name: "Hawaii", terrain: "Democrats have won every statewide race since 2006 and hold supermajorities in both legislative chambers. The governor's race headlines the ballot." },
+    "ID": { name: "Idaho", terrain: "Governor, Senate, and two House seats on the ballot. Democrats last won the governorship in 1990 and a federal race in 2008." },
+    "IL": { name: "Illinois", terrain: "Democrats hold every statewide office and veto-proof legislative supermajorities. An open Senate seat and the governor\u2019s third-term bid headline the 2026 ballot." },
+    "IN": { name: "Indiana", terrain: "Three statewide offices and nine House seats are on the ballot. Democrats last won a statewide race here in 2012." },
+    "IA": { name: "Iowa", terrain: "An open Senate seat, a governor\u2019s race, and four House seats are on the ballot. Republicans hold the governorship and all four House seats." },
+    "KS": { name: "Kansas", terrain: "A Senate seat, an open governor's race, and four House seats are on the ballot. Democrats have held the governorship since 2019 in a state Trump carried by 16 points." },
+    "KY": { name: "Kentucky", terrain: "No competitive federal races on the 2026 ballot. Beshear (D) governs under a Republican supermajority." },
+    "LA": { name: "Louisiana", terrain: "No competitive federal races expected. Republican trifecta following Landry\u2019s 2023 election." },
+    "MD": { name: "Maryland", terrain: "No competitive federal races. Democratic supermajorities in both chambers." },
+    "MA": { name: "Massachusetts", terrain: "No competitive federal races expected. Democratic supermajorities in both chambers." },
+    "MS": { name: "Mississippi", terrain: "A Senate seat and four House seats are on the ballot; the governor's office runs on an odd-year cycle. Democrats hold one of the four House seats." },
+    "MO": { name: "Missouri", terrain: "Eight House seats are on the ballot with no Senate or governor's race in 2026. Democrats hold two of the eight." },
+    "MT": { name: "Montana", terrain: "A Senate seat, a governor's race, and two House seats are on the ballot. Democrats last won a federal race here in 2018." },
+    "NV": { name: "Nevada", terrain: "A governor's race and four House seats are on the ballot with no Senate race in 2026. Democrats hold three of the four House seats." },
+    "NH": { name: "New Hampshire", terrain: "An open Senate seat, a governor's race, and two House seats are on the ballot. Democrats hold the Senate seat and both House seats in a state decided by fewer than three points." },
+    "NM": { name: "New Mexico", terrain: "A Senate seat, an open governor's race, and three House seats are on the ballot. Democrats hold all statewide offices and two of the three seats." },
+    "NY": { name: "New York", terrain: "A governor's race and twenty-six House seats are on the ballot with no Senate race in 2026. Democrats hold the governor's office and nineteen of the twenty-six seats." },
+    "ND": { name: "North Dakota", terrain: "One House seat is on the ballot with no Senate or governor's race in 2026. Republicans hold every federal and statewide office." },
+    "OH": { name: "Ohio", terrain: "A Senate special election, an open governor's race, and fifteen House seats are on the ballot. Democrats hold no statewide offices and five of the fifteen House seats." },
+    "OK": { name: "Oklahoma", terrain: "A Senate seat, an open governor's race, and five House seats are on the ballot. Republicans hold all of them." },
+    "OR": { name: "Oregon", terrain: "A Senate seat, a governor's race, and six House seats are on the ballot. Democrats hold all statewide offices and five of the six seats." },
+    "RI": { name: "Rhode Island", terrain: "A Senate seat, a governor's race, and two House seats are on the ballot. Democrats hold all of them." },
+    "SC": { name: "South Carolina", terrain: "A Senate seat, an open governor's race, and seven House seats are on the ballot. Democrats hold one of the seven House seats." },
+    "SD": { name: "South Dakota", terrain: "A Senate seat, a governor's race, and one House seat are on the ballot. Republicans hold all of them." },
+    "TN": { name: "Tennessee", terrain: "A Senate seat, an open governor's race, and nine House seats are on the ballot. Democrats hold one of the nine House seats." },
+    "TX": { name: "Texas", terrain: "A Senate seat, a governor's race, and thirty-eight House seats are on the ballot. Democrats hold thirteen of the thirty-eight seats after mid-decade redistricting." },
+    "UT": { name: "Utah", terrain: "Four House seats are on the ballot with no Senate or governor's race in 2026. Republicans hold all of them." },
+    "VT": { name: "Vermont", terrain: "A governor's race and one House seat are on the ballot with no Senate race in 2026. A Republican governor holds office in the most Democratic state in the country." },
+    "WV": { name: "West Virginia", terrain: "A Senate seat and two House seats are on the ballot with no governor's race in 2026. Democrats last won a federal race here in 2018." },
+    "WY": { name: "Wyoming", terrain: "An open Senate seat, an open governor's race, and an open House seat are on the ballot. All three are open at once in the most Republican state in the country." }
+};
+
+/* === PRIMARY DATES (50 states + DC) === */
+/* Source: FEC compiled congressional primary dates, data as of 1/9/2026 */
+/* General election: November 3, 2026 */
+
+var PRIMARY_DATES = {
+    "AL": "May 19", "AK": "August 18", "AZ": "August 4", "AR": "March 3",
+    "CA": "June 2", "CO": "June 30", "CT": "August 11", "DE": "September 15",
+    "DC": "June 16", "FL": "August 18", "GA": "May 19", "HI": "August 8",
+    "ID": "May 19", "IL": "March 17", "IN": "May 5", "IA": "June 2",
+    "KS": "August 4", "KY": "May 19", "LA": "May 16", "ME": "June 9",
+    "MD": "June 23", "MA": "September 1", "MI": "August 4", "MN": "August 11",
+    "MS": "March 10", "MO": "August 4", "MT": "June 2", "NE": "May 12",
+    "NV": "June 9", "NH": "September 8", "NJ": "June 2", "NM": "June 2",
+    "NY": "June 23", "NC": "March 3", "ND": "June 9", "OH": "May 5",
+    "OK": "June 16", "OR": "May 19", "PA": "May 19", "RI": "September 8",
+    "SC": "June 9", "SD": "June 2", "TN": "August 6", "TX": "March 3",
+    "UT": "June 23", "VT": "August 11", "VA": "June 16", "WA": "August 4",
+    "WV": "May 12", "WI": "August 11", "WY": "August 18"
+};
+
+/* =========================================
+   DO NOT EDIT BELOW THIS LINE
+   Rendering, interaction, and layout code.
+   Last modified: February 3, 2026
+   ========================================= */
+
+/* Abbreviation to FIPS for D3 rendering */
+var ABBR_FIPS = {
+    "AL":"01","AK":"02","AZ":"04","AR":"05","CA":"06","CO":"08","CT":"09","DE":"10",
+    "DC":"11","FL":"12","GA":"13","HI":"15","ID":"16","IL":"17","IN":"18","IA":"19",
+    "KS":"20","KY":"21","LA":"22","ME":"23","MD":"24","MA":"25","MI":"26","MN":"27",
+    "MS":"28","MO":"29","MT":"30","NE":"31","NV":"32","NH":"33","NJ":"34","NM":"35",
+    "NY":"36","NC":"37","ND":"38","OH":"39","OK":"40","OR":"41","PA":"42","RI":"44",
+    "SC":"45","SD":"46","TN":"47","TX":"48","UT":"49","VT":"50","VA":"51","WA":"53",
+    "WV":"54","WI":"55","WY":"56"
+};
+
+var FIPS_ABBR = {};
+Object.keys(ABBR_FIPS).forEach(function(a) { FIPS_ABBR[ABBR_FIPS[a]] = a; });
+
+/* Label nudges computed by calibration tool (calibrate-labels.html).
+   Positions derived from rendered SVG geometry using isPointInFill()
+   and visual center sampling. Re-run calibration tool if projection changes. */
+var NUDGE = {
+    "AK":[-12,-12],"AL":[-2,-6],"AR":[-8,-6],"AZ":[-5,-8],
+    "CA":[-25,-66],"CO":[-5,-1],"CT":[-5,0],"DC":[58,18],
+    "DE":[22,-3],"FL":[11,-4],"GA":[-1,4],"HI":[17,10],
+    "IA":[-7,-1],"ID":[-11,18],"IL":[-2,-8],"IN":[0,-17],
+    "KS":[-30,-1],"KY":[17,-6],"LA":[-14,-24],"MA":[3,-3],
+    "MD":[-5,-7],"ME":[-2,-6],"MI":[16,31],"MN":[-6,-15],
+    "MO":[-10,-3],"MS":[-2,4],"MT":[-28,-2],"ND":[-16,-1],
+    "NE":[-8,-1],"NH":[0,9],"NM":[-1,-7],"NV":[2,-15],
+    "OH":[-5,-1],"OR":[6,0],"PA":[-18,0],"RI":[20,2],
+    "SC":[3,-2],"SD":[-25,-2],"TN":[-16,1],"TX":[17,-3],
+    "UT":[-4,10],"VT":[-2,-8],"WI":[7,0],"WV":[-12,11],
+    "WY":[-12,-4]
+};
+
+(function() {
+    var wrap = document.getElementById('map-wrap');
+    var loading = document.getElementById('loading');
+    var panel = document.getElementById('panel');
+    var pState = document.getElementById('p-state');
+    var pBody = document.getElementById('p-body');
+    var pClose = document.getElementById('p-close');
+    var prompt = document.getElementById('prompt');
+    var activeEl = null;
+
+    var d3ok = (typeof d3 !== 'undefined');
+    var topook = (typeof topojson !== 'undefined');
+
+    if (d3ok && topook) {
+        d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json')
+            .then(renderD3)
+            .catch(function() {
+                return d3.json('https://unpkg.com/us-atlas@3/states-albers-10m.json');
+            })
+            .then(function(us) { if (us) renderD3(us); })
+            .catch(showError);
+    } else {
+        showError();
+    }
+
+    function showError() {
+        loading.remove();
+        var msg = document.createElement('div');
+        msg.className = 'map-error';
+        msg.textContent = 'Map loading. Please refresh the page.';
+        wrap.appendChild(msg);
+    }
+
+    function renderD3(us) {
+        if (!us || !us.objects) return;
+        loading.remove();
+        var path = d3.geoPath();
+
+        var svg = d3.select(wrap).append('svg')
+            .attr('id', 'map-svg')
+            .attr('viewBox', '0 0 975 610')
+            .attr('preserveAspectRatio', 'xMidYMid meet')
+            .attr('role', 'img')
+            .attr('aria-label', 'United States map showing 2026 race coverage');
+
+        var states = topojson.feature(us, us.objects.states).features;
+
+        svg.append('g')
+            .selectAll('path')
+            .data(states)
+            .enter().append('path')
+            .attr('d', path)
+            .attr('data-fips', function(d) { return String(d.id).padStart(2, '0'); })
+            .attr('class', function(d) {
+                var fips = String(d.id).padStart(2, '0');
+                var abbr = FIPS_ABBR[fips];
+                var st = abbr ? DATA[abbr] : null;
+                if (st && st.coverage) return 'state-fill covered';
+                if (st) return 'state-fill has-terrain';
+                return 'state-fill';
+            })
+            .on('click', function(event, d) {
+                var fips = String(d.id).padStart(2, '0');
+                var abbr = FIPS_ABBR[fips];
+                if (abbr && DATA[abbr]) {
+                    openPanel(abbr, this);
+                } else {
+                    /* Brief tooltip for uncovered states */
+                    var tip = document.getElementById('coming-soon');
+                    var rect = document.getElementById('map-wrap').getBoundingClientRect();
+                    tip.style.left = (event.clientX - rect.left + 12) + 'px';
+                    tip.style.top = (event.clientY - rect.top - 30) + 'px';
+                    tip.classList.add('visible');
+                    clearTimeout(window._tipTimer);
+                    window._tipTimer = setTimeout(function() {
+                        tip.classList.remove('visible');
+                    }, 1500);
+                }
+            });
+
+        svg.append('path')
+            .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+            .attr('class', 'state-borders')
+            .attr('d', path);
+
+        svg.append('path')
+            .datum(topojson.feature(us, us.objects.nation))
+            .attr('class', 'nation-border')
+            .attr('d', path);
+
+        var g = svg.append('g');
+        /* States that get leader lines (label nudged far outside state) */
+        var LEADER_STATES = {"DC":true, "DE":true, "RI":true};
+
+        states.forEach(function(d, i) {
+            var fips = String(d.id).padStart(2, '0');
+            var abbr = FIPS_ABBR[fips];
+            if (!abbr) return;
+            var c = path.centroid(d);
+            if (!c || isNaN(c[0])) return;
+            var n = NUDGE[abbr] || [0, 0];
+            var lx = c[0] + n[0];
+            var ly = c[1] + n[1];
+            var st = DATA[abbr];
+
+            /* Draw leader line + anchor dot before label so label renders on top */
+            if (LEADER_STATES[abbr]) {
+                g.append('line')
+                    .attr('class', 'leader-line')
+                    .attr('x1', c[0])
+                    .attr('y1', c[1])
+                    .attr('x2', lx - 8)
+                    .attr('y2', ly);
+                g.append('circle')
+                    .attr('class', 'leader-dot')
+                    .attr('cx', c[0])
+                    .attr('cy', c[1])
+                    .attr('r', 2);
+            }
+
+            var labelClass = 'state-label ' + ((st && st.coverage) ? 'on-gold' : 'on-dark');
+            var t = g.append('text')
+                .attr('class', labelClass)
+                .attr('x', lx)
+                .attr('y', ly)
+                .text(abbr);
+            setTimeout(function() { t.classed('visible', true); }, 60 + i * 10);
+        });
+    }
+
+    /* Subscribe form handler: posts into hidden iframe, user never leaves the map */
+    var subFrame = document.createElement('iframe');
+    subFrame.name = 'subscribe-target';
+    subFrame.style.cssText = 'display:none;width:0;height:0;border:0;';
+    document.body.appendChild(subFrame);
+
+    window.handleSubscribe = function(abbr) {
+        var input = document.getElementById('subscribe-email');
+        var email = input ? input.value.trim() : '';
+        if (!email || email.indexOf('@') < 1) {
+            input.style.borderColor = '#c0392b';
+            setTimeout(function() { input.style.borderColor = ''; }, 1500);
+            return;
+        }
+        /* Build and submit a form into the hidden iframe */
+        var f = document.createElement('form');
+        f.method = 'POST';
+        f.action = 'https://subscribe-forms.beehiiv.com/145781fe-c593-4a8a-a037-2ba2f8d475b7';
+        f.target = 'subscribe-target';
+        f.style.display = 'none';
+        var e = document.createElement('input');
+        e.name = 'email'; e.value = email;
+        f.appendChild(e);
+        var s = document.createElement('input');
+        s.name = 'utm_source'; s.value = 'racemap';
+        f.appendChild(s);
+        var c = document.createElement('input');
+        c.name = 'utm_content'; c.value = abbr;
+        f.appendChild(c);
+        document.body.appendChild(f);
+        f.submit();
+        document.body.removeChild(f);
+        /* Show confirmation */
+        var container = input.closest('.panel-subscribe');
+        container.innerHTML = '<div class="subscribe-confirm">You\u2019re in. Check your inbox to confirm.</div>';
+    };
+
+    function openPanel(abbr, el) {
+        if (activeEl) activeEl.classList.remove('active');
+        if (el) { el.classList.add('active'); activeEl = el; }
+
+        var d = DATA[abbr];
+        pState.textContent = d.name;
+
+        var html = '';
+
+        /* Line 1: Terrain headline */
+        html += '<div class="panel-terrain">' + d.terrain + '</div>';
+
+        /* Line 2: Primary date */
+        if (PRIMARY_DATES[abbr]) {
+            html += '<div class="panel-primary"><strong>Primary:</strong> ' + PRIMARY_DATES[abbr] + ', 2026</div>';
+        }
+
+        /* Line 3: Coverage entries (covered states only) */
+        if (d.coverage && d.coverage.length > 0) {
+            html += '<div class="panel-coverage">';
+            d.coverage.forEach(function(c) {
+                html += '<div class="coverage-entry">';
+                /* Metadata header: District Â· Status Â· PVI Â· Primary Date */
+                if (c.district) {
+                    html += '<div class="coverage-meta">';
+                    html += '<span class="meta-district">' + c.district + '</span>';
+                    if (c.status) {
+                        html += '<span class="meta-sep">\u00B7</span>';
+                        html += '<span class="meta-status">' + c.status + '</span>';
+                    }
+                    if (c.pvi) {
+                        html += '<span class="meta-sep">\u00B7</span>';
+                        html += '<span class="meta-pvi">' + c.pvi + '</span>';
+                    }
+                    if (PRIMARY_DATES[abbr]) {
+                        html += '<span class="meta-sep">\u00B7</span>';
+                        html += '<span class="meta-status">Primary ' + PRIMARY_DATES[abbr] + '</span>';
+                    }
+                    html += '</div>';
+                }
+                html += '<div class="coverage-date">WICC \u00B7 ' + c.date + '</div>';
+                html += '<div class="coverage-line">' + c.line + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
+        /* Subscribe form (all states) */
+        html += '<div class="panel-subscribe">';
+        html += '<div class="subscribe-label">Stay ahead of every race</div>';
+        html += '<div class="subscribe-row">';
+        html += '<input type="email" id="subscribe-email" placeholder="you@email.com" autocomplete="email" onkeydown="if(event.key===\'Enter\'){handleSubscribe(\'' + abbr + '\');}" />';
+        html += '<button onclick="handleSubscribe(\'' + abbr + '\')">Subscribe</button>';
+        html += '</div>';
+        html += '</div>';
+
+        pBody.innerHTML = html;
+
+        panel.classList.remove('open');
+        void panel.offsetWidth;
+        panel.classList.add('open');
+        prompt.classList.add('hidden');
+
+        if (window.innerWidth < 768) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    pClose.addEventListener('click', function() {
+        panel.classList.remove('open');
+        prompt.classList.remove('hidden');
+        if (activeEl) { activeEl.classList.remove('active'); activeEl = null; }
+    });
+})();
+
+/* === IFRAME HEIGHT REPORTER ===
+   Sends content height to parent window (Squarespace)
+   so the iframe resizes dynamically when panels open/close.
+   Harmless when loaded standalone (no parent listener). */
+(function() {
+    function sendHeight() {
+        var h = document.documentElement.scrollHeight || document.body.scrollHeight;
+        window.parent.postMessage({ type: 'setHeight', height: h }, '*');
+    }
+    window.addEventListener('load', sendHeight);
+    window.addEventListener('resize', sendHeight);
+    /* Catch async D3 render and panel open/close */
+    var observer = new MutationObserver(sendHeight);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    /* Fallback for slow TopoJSON fetch */
+    setTimeout(sendHeight, 3000);
+})();
+
+</script>
+
+</body>
+</html>
